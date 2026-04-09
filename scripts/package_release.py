@@ -17,12 +17,20 @@ VERSION_FILE = ROOT / "src" / "bitloops_embeddings" / "version.py"
 ENTRYPOINT = ROOT / "src" / "bitloops_embeddings" / "__main__.py"
 PYINSTALLER_COLLECT_SUBMODULES = [
     "sentence_transformers",
+    "transformers.models.auto",
+    "transformers.models.xlm_roberta",
 ]
 PYINSTALLER_COLLECT_DATA = [
     "sentence_transformers",
+    "transformers",
 ]
 PYINSTALLER_COPY_METADATA = [
     "sentence-transformers",
+    "transformers",
+    "huggingface-hub",
+    "tokenizers",
+    "safetensors",
+    "torch",
 ]
 PYINSTALLER_EXCLUDED_MODULES = [
     "pytest",

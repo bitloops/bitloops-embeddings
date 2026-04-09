@@ -78,6 +78,13 @@ class SentenceTransformersBackend:
             except Exception as exc:
                 self._model = None
                 if attempt >= max_attempts or not _is_retryable_load_exception(exc):
+                    logging.getLogger(LOGGER_NAME).exception(
+                        "event=model_load_failed model_id=%s backend=%s upstream_model_id=%s device=%s",
+                        self.model_id,
+                        self.backend_name,
+                        self._upstream_model_id,
+                        self._device,
+                    )
                     raise BackendLoadError(
                         f"Failed to load model '{self.model_id}' from '{self._upstream_model_id}'."
                     ) from exc
@@ -125,7 +132,7 @@ class SentenceTransformersBackend:
 
 
 def _is_retryable_load_exception(exc: Exception) -> bool:
-    message = str(exc).lower()
+    message = " ".join(_iter_exception_messages(exc)).lower()
     retryable_markers = (
         "http error 500",
         "http error 502",
@@ -142,6 +149,21 @@ def _is_retryable_load_exception(exc: Exception) -> bool:
         "too many requests",
     )
     return any(marker in message for marker in retryable_markers)
+
+
+def _iter_exception_messages(exc: Exception) -> list[str]:
+    messages: list[str] = []
+    seen: set[int] = set()
+    current: BaseException | None = exc
+
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        message = str(current)
+        if message:
+            messages.append(message)
+        current = current.__cause__ or current.__context__
+
+    return messages
 
 
 def resolve_inference_device() -> str:
