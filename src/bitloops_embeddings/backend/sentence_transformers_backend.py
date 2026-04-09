@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import platform
 import time
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,7 @@ class SentenceTransformersBackend:
         self._cache_dir = cache_dir
         self._dimensions = dimensions
         self._model: Any = None
+        self._device = resolve_inference_device()
 
     @property
     def model_id(self) -> str:
@@ -67,7 +69,7 @@ class SentenceTransformersBackend:
                 self._model = SentenceTransformer(
                     self._upstream_model_id,
                     cache_folder=str(self._cache_dir),
-                    device="cpu",
+                    device=self._device,
                 )
                 detected_dimensions = self._model.get_sentence_embedding_dimension()
                 if detected_dimensions is not None:
@@ -96,6 +98,7 @@ class SentenceTransformersBackend:
             "model_load_complete",
             model_id=self.model_id,
             backend=self.backend_name,
+            device=self._device,
             dimensions=self.dimensions,
         )
 
@@ -139,3 +142,30 @@ def _is_retryable_load_exception(exc: Exception) -> bool:
         "too many requests",
     )
     return any(marker in message for marker in retryable_markers)
+
+
+def resolve_inference_device() -> str:
+    if platform.system() != "Darwin":
+        return "cpu"
+
+    if platform.machine().lower() not in ("arm64", "aarch64"):
+        return "cpu"
+
+    try:
+        import torch
+    except ImportError:
+        return "cpu"
+
+    mps_backend = getattr(getattr(torch, "backends", None), "mps", None)
+    if mps_backend is None:
+        return "cpu"
+
+    is_built = getattr(mps_backend, "is_built", None)
+    if callable(is_built) and not is_built():
+        return "cpu"
+
+    is_available = getattr(mps_backend, "is_available", None)
+    if callable(is_available) and is_available():
+        return "mps"
+
+    return "cpu"

@@ -3,14 +3,19 @@ from __future__ import annotations
 import sys
 from types import ModuleType
 
-from bitloops_embeddings.backend.sentence_transformers_backend import SentenceTransformersBackend
+from bitloops_embeddings.backend.sentence_transformers_backend import (
+    SentenceTransformersBackend,
+    resolve_inference_device,
+)
 
 
 class FakeSentenceTransformer:
     attempts = 0
+    last_device: str | None = None
 
     def __init__(self, *args, **kwargs) -> None:
         type(self).attempts += 1
+        type(self).last_device = kwargs.get("device")
         if type(self).attempts < 3:
             raise RuntimeError("HTTP Error 503 thrown while requesting HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json")
 
@@ -27,6 +32,7 @@ def test_sentence_transformers_backend_retries_transient_load_failures(
     monkeypatch.setitem(sys.modules, "sentence_transformers", fake_module)
     monkeypatch.setattr("bitloops_embeddings.backend.sentence_transformers_backend.time.sleep", lambda _: None)
     FakeSentenceTransformer.attempts = 0
+    FakeSentenceTransformer.last_device = None
 
     backend = SentenceTransformersBackend(
         model_id="bge-m3",
@@ -40,3 +46,40 @@ def test_sentence_transformers_backend_retries_transient_load_failures(
     assert backend.is_loaded is True
     assert backend.dimensions == 1024
     assert FakeSentenceTransformer.attempts == 3
+    assert FakeSentenceTransformer.last_device == "cpu"
+
+
+def test_resolve_inference_device_prefers_mps_on_apple_silicon(monkeypatch) -> None:
+    fake_torch = ModuleType("torch")
+    fake_torch.backends = ModuleType("backends")
+    fake_torch.backends.mps = type(
+        "FakeMpsBackend",
+        (),
+        {
+            "is_built": staticmethod(lambda: True),
+            "is_available": staticmethod(lambda: True),
+        },
+    )()
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setattr("bitloops_embeddings.backend.sentence_transformers_backend.platform.system", lambda: "Darwin")
+    monkeypatch.setattr("bitloops_embeddings.backend.sentence_transformers_backend.platform.machine", lambda: "arm64")
+
+    assert resolve_inference_device() == "mps"
+
+
+def test_resolve_inference_device_falls_back_to_cpu_when_mps_is_unavailable(monkeypatch) -> None:
+    fake_torch = ModuleType("torch")
+    fake_torch.backends = ModuleType("backends")
+    fake_torch.backends.mps = type(
+        "FakeMpsBackend",
+        (),
+        {
+            "is_built": staticmethod(lambda: True),
+            "is_available": staticmethod(lambda: False),
+        },
+    )()
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setattr("bitloops_embeddings.backend.sentence_transformers_backend.platform.system", lambda: "Darwin")
+    monkeypatch.setattr("bitloops_embeddings.backend.sentence_transformers_backend.platform.machine", lambda: "arm64")
+
+    assert resolve_inference_device() == "cpu"

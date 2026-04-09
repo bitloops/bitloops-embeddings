@@ -16,10 +16,30 @@ The initial public model identifier is `bge-m3`.
 - Public model id: `bge-m3`
 - Upstream model id: `BAAI/bge-m3`
 - Backend: `sentence-transformers`
-- Device: CPU
+- Device:
+  - Apple Silicon macOS: `mps` when available, otherwise CPU
+  - all other current targets: CPU
 - Provisioning: first-run download into a local cache directory
 
 The command and HTTP layers are written against an internal backend registry so additional models or inference backends can be added later without changing the user-facing contracts.
+
+## Acceleration support
+
+Current hardware acceleration support is intentionally limited in `v0.1.0`:
+
+- `aarch64-apple-darwin`:
+  - uses Apple Metal Performance Shaders (`mps`) automatically when available
+  - falls back to CPU if MPS is unavailable
+- `x86_64-apple-darwin`:
+  - CPU only
+- `x86_64-unknown-linux-gnu`:
+  - CPU only
+- `aarch64-unknown-linux-gnu`:
+  - CPU only
+- `x86_64-pc-windows-msvc`:
+  - CPU only
+
+The current release does not expose CUDA, ROCm, DirectML, or Intel GPU acceleration paths yet.
 
 ## Requirements
 

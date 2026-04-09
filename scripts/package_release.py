@@ -15,17 +15,48 @@ ROOT = Path(__file__).resolve().parent.parent
 PACKAGE_NAME = "bitloops-embeddings"
 VERSION_FILE = ROOT / "src" / "bitloops_embeddings" / "version.py"
 ENTRYPOINT = ROOT / "src" / "bitloops_embeddings" / "__main__.py"
-PYINSTALLER_PACKAGES = [
+PYINSTALLER_COLLECT_SUBMODULES = [
     "sentence_transformers",
-    "transformers",
-    "tokenizers",
-    "torch",
-    "safetensors",
-    "huggingface_hub",
-    "numpy",
-    "scipy",
-    "sklearn",
 ]
+PYINSTALLER_COLLECT_DATA = [
+    "sentence_transformers",
+]
+PYINSTALLER_COPY_METADATA = [
+    "sentence-transformers",
+]
+PYINSTALLER_EXCLUDED_MODULES = [
+    "pytest",
+    "IPython",
+    "jedi",
+    "matplotlib",
+    "nvidia",
+    "notebook",
+    "pandas",
+    "tensorboard",
+    "tensorflow",
+    "triton",
+    "torchvision",
+    "torchaudio",
+]
+LINUX_GPU_LIBRARY_PREFIXES = (
+    "libc10_cuda",
+    "libcudart",
+    "libcudnn",
+    "libcufft",
+    "libcupti",
+    "libcublas",
+    "libcublasLt",
+    "libcurand",
+    "libcusolver",
+    "libcusparse",
+    "libcusparseLt",
+    "libnccl",
+    "libnvJitLink",
+    "libnvrtc",
+    "libnvToolsExt",
+    "libnpp",
+    "libtorch_cuda",
+)
 
 
 def main() -> None:
@@ -91,6 +122,8 @@ def build_release(*, version: str, target: str, archive_dir: Path) -> tuple[Path
     )
 
     shutil.copytree(pyinstaller_dist / PACKAGE_NAME, bundle_dir)
+    if target.endswith("unknown-linux-gnu"):
+        prune_linux_gpu_payload(bundle_dir)
     shutil.copy2(ROOT / "README.md", staging_dir / "README.md")
     shutil.copy2(ROOT / "LICENSE", staging_dir / "LICENSE")
 
@@ -103,6 +136,9 @@ def build_release(*, version: str, target: str, archive_dir: Path) -> tuple[Path
         with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for path in staging_dir.rglob("*"):
                 archive.write(path, arcname=path.relative_to(package_root))
+    elif archive_extension == ".tar.xz":
+        with tarfile.open(archive_path, "w:xz") as archive:
+            archive.add(staging_dir, arcname=archive_root_name)
     else:
         with tarfile.open(archive_path, "w:gz") as archive:
             archive.add(staging_dir, arcname=archive_root_name)
@@ -136,8 +172,17 @@ def run_pyinstaller(
     if sys.platform == "darwin" and codesign_identity:
         command.extend(["--codesign-identity", codesign_identity])
 
-    for package in PYINSTALLER_PACKAGES:
-        command.extend(["--collect-all", package])
+    for module_name in PYINSTALLER_COLLECT_SUBMODULES:
+        command.extend(["--collect-submodules", module_name])
+
+    for module_name in PYINSTALLER_COLLECT_DATA:
+        command.extend(["--collect-data", module_name])
+
+    for package_name in PYINSTALLER_COPY_METADATA:
+        command.extend(["--recursive-copy-metadata", package_name])
+
+    for module_name in PYINSTALLER_EXCLUDED_MODULES:
+        command.extend(["--exclude-module", module_name])
 
     command.append(str(ENTRYPOINT))
 
@@ -178,13 +223,35 @@ def executable_name_for_target(target: str) -> str:
 def archive_extension_for_target(target: str) -> str:
     if target.endswith("windows-msvc") or target.endswith("apple-darwin"):
         return ".zip"
-    return ".tar.gz"
+    return ".tar.xz"
 
 
 def write_github_outputs(output_path: Path, outputs: dict[str, str]) -> None:
     with output_path.open("a", encoding="utf-8") as file_handle:
         for key, value in outputs.items():
             file_handle.write(f"{key}={value}\n")
+
+
+def prune_linux_gpu_payload(bundle_dir: Path) -> None:
+    removable_directories = []
+    for pattern in ("**/nvidia", "**/triton"):
+        removable_directories.extend(
+            path for path in bundle_dir.glob(pattern) if path.is_dir()
+        )
+
+    for path in sorted(removable_directories, reverse=True):
+        shutil.rmtree(path, ignore_errors=True)
+
+    for path in bundle_dir.rglob("*"):
+        if not path.is_file():
+            continue
+
+        name = path.name
+        if name.endswith(".pyc"):
+            continue
+
+        if name.startswith(LINUX_GPU_LIBRARY_PREFIXES):
+            path.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

@@ -101,6 +101,11 @@ jobs:
             --archive-dir build/artifacts \
             --github-output "${GITHUB_OUTPUT}"
 
+      - name: Report packaged archive size
+        shell: bash
+        run: |
+          ls -lh "${{ steps.package.outputs.archive_path }}"
+
       - name: Verify macOS packaged signature
         if: runner.os == 'macOS'
         shell: bash
@@ -160,10 +165,41 @@ jobs:
           path: release-artifacts
           merge-multiple: true
 
+      - name: Filter release assets to GitHub size limit
+        id: release_assets
+        shell: bash
+        run: |
+          mkdir -p release-upload
+          LIMIT_BYTES=2147483647
+
+          for path in release-artifacts/*; do
+            if [[ ! -f "$path" ]]; then
+              continue
+            fi
+
+            size_bytes="$(stat -c %s "$path")"
+            name="$(basename "$path")"
+
+            if (( size_bytes > LIMIT_BYTES )); then
+              echo "Skipping oversized release asset: ${name} (${size_bytes} bytes)" >&2
+              if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+                echo "- skipped \`${name}\` because it exceeds the GitHub Release asset limit (${size_bytes} bytes)" >> "$GITHUB_STEP_SUMMARY"
+              fi
+              continue
+            fi
+
+            cp "$path" "release-upload/$name"
+          done
+
+          if ! compgen -G "release-upload/*" > /dev/null; then
+            echo "No release assets fit within the GitHub Release size limit." >&2
+            exit 1
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release-artifacts/*
+          files: release-upload/*
 
       - name: Send Slack notification
         if: env.SLACK_WEBHOOK_URL != ''
