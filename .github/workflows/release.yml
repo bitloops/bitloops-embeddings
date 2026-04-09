@@ -41,10 +41,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: "pip"
@@ -141,7 +141,7 @@ jobs:
         run: python scripts/real_backend_smoke.py --binary "${{ steps.package.outputs.bundle_executable }}"
 
       - name: Upload packaged artefact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.target }}
           path: ${{ steps.package.outputs.archive_path }}
@@ -155,7 +155,7 @@ jobs:
 
     steps:
       - name: Download packaged artefacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: release-artifacts
           merge-multiple: true
