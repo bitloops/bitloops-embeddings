@@ -64,6 +64,36 @@ jobs:
         shell: bash
         run: python scripts/real_backend_smoke.py --binary bitloops-embeddings
 
+      - name: Switch Linux packaging environment to CPU-only torch
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          TORCH_VERSION="$(python - <<'PY'
+          import importlib.metadata
+          print(importlib.metadata.version("torch"))
+          PY
+          )"
+
+          mapfile -t GPU_PACKAGES < <(python - <<'PY'
+          import subprocess
+          import sys
+
+          output = subprocess.check_output([sys.executable, "-m", "pip", "freeze"], text=True)
+          for line in output.splitlines():
+              name = line.split("==", 1)[0]
+              lower = name.lower()
+              if lower.startswith("nvidia-") or lower == "triton":
+                  print(name)
+          PY
+          )
+
+          if ((${#GPU_PACKAGES[@]} > 0)); then
+            python -m pip uninstall -y "${GPU_PACKAGES[@]}"
+          fi
+
+          python -m pip uninstall -y torch
+          python -m pip install "torch==${TORCH_VERSION}" --index-url https://download.pytorch.org/whl/cpu
+
       - name: Import Apple signing certificate
         if: runner.os == 'macOS'
         env:

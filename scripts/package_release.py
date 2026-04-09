@@ -29,34 +29,13 @@ PYINSTALLER_EXCLUDED_MODULES = [
     "IPython",
     "jedi",
     "matplotlib",
-    "nvidia",
     "notebook",
     "pandas",
     "tensorboard",
     "tensorflow",
-    "triton",
     "torchvision",
     "torchaudio",
 ]
-LINUX_GPU_LIBRARY_PREFIXES = (
-    "libc10_cuda",
-    "libcudart",
-    "libcudnn",
-    "libcufft",
-    "libcupti",
-    "libcublas",
-    "libcublasLt",
-    "libcurand",
-    "libcusolver",
-    "libcusparse",
-    "libcusparseLt",
-    "libnccl",
-    "libnvJitLink",
-    "libnvrtc",
-    "libnvToolsExt",
-    "libnpp",
-    "libtorch_cuda",
-)
 
 
 def main() -> None:
@@ -122,8 +101,6 @@ def build_release(*, version: str, target: str, archive_dir: Path) -> tuple[Path
     )
 
     shutil.copytree(pyinstaller_dist / PACKAGE_NAME, bundle_dir)
-    if target.endswith("unknown-linux-gnu"):
-        prune_linux_gpu_payload(bundle_dir)
     shutil.copy2(ROOT / "README.md", staging_dir / "README.md")
     shutil.copy2(ROOT / "LICENSE", staging_dir / "LICENSE")
 
@@ -230,28 +207,6 @@ def write_github_outputs(output_path: Path, outputs: dict[str, str]) -> None:
     with output_path.open("a", encoding="utf-8") as file_handle:
         for key, value in outputs.items():
             file_handle.write(f"{key}={value}\n")
-
-
-def prune_linux_gpu_payload(bundle_dir: Path) -> None:
-    removable_directories = []
-    for pattern in ("**/nvidia", "**/triton"):
-        removable_directories.extend(
-            path for path in bundle_dir.glob(pattern) if path.is_dir()
-        )
-
-    for path in sorted(removable_directories, reverse=True):
-        shutil.rmtree(path, ignore_errors=True)
-
-    for path in bundle_dir.rglob("*"):
-        if not path.is_file():
-            continue
-
-        name = path.name
-        if name.endswith(".pyc"):
-            continue
-
-        if name.startswith(LINUX_GPU_LIBRARY_PREFIXES):
-            path.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
