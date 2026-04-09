@@ -89,7 +89,7 @@ def build_release(*, version: str, target: str, archive_dir: Path) -> tuple[Path
     shutil.copy2(ROOT / "README.md", staging_dir / "README.md")
     shutil.copy2(ROOT / "LICENSE", staging_dir / "LICENSE")
 
-    archive_extension = ".zip" if target.endswith("windows-msvc") else ".tar.gz"
+    archive_extension = archive_extension_for_target(target)
     archive_path = archive_dir / f"{archive_root_name}{archive_extension}"
     if archive_path.exists():
         archive_path.unlink()
@@ -160,6 +160,12 @@ def executable_name_for_target(target: str) -> str:
     if target.endswith("windows-msvc"):
         return f"{PACKAGE_NAME}.exe"
     return PACKAGE_NAME
+
+
+def archive_extension_for_target(target: str) -> str:
+    if target.endswith("windows-msvc") or target.endswith("apple-darwin"):
+        return ".zip"
+    return ".tar.gz"
 
 
 def write_github_outputs(output_path: Path, outputs: dict[str, str]) -> None:

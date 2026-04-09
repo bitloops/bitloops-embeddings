@@ -73,10 +73,95 @@ jobs:
             --archive-dir build/artifacts \
             --github-output "${GITHUB_OUTPUT}"
 
+      - name: Import Apple signing certificate
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+        shell: bash
+        run: |
+          echo "$APPLE_CERT_P12_BASE64" | base64 --decode > apple-cert.p12
+
+          security create-keychain -p temp123 build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p temp123 build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+
+          security import apple-cert.p12 \
+            -k build.keychain \
+            -P "$APPLE_CERT_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k temp123 \
+            build.keychain
+
+      - name: Sign macOS packaged bundle
+        if: runner.os == 'macOS'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY || secrets.APPLE_SIGNING_IDENTITY }}
+        shell: bash
+        run: |
+          BUNDLE_DIR="${{ steps.package.outputs.bundle_dir }}"
+          BUNDLE_EXECUTABLE="${{ steps.package.outputs.bundle_executable }}"
+
+          while IFS= read -r -d '' path; do
+            if file "$path" | grep -q 'Mach-O'; then
+              codesign --force --options runtime --timestamp \
+                --sign "$APPLE_SIGNING_IDENTITY" \
+                "$path"
+            fi
+          done < <(find "$BUNDLE_DIR" -type f -print0)
+
+          codesign --force --options runtime --timestamp \
+            --sign "$APPLE_SIGNING_IDENTITY" \
+            "$BUNDLE_EXECUTABLE"
+
+      - name: Verify macOS packaged signature
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          codesign --verify --verbose=4 "${{ steps.package.outputs.bundle_executable }}"
+          codesign --display --verbose=4 "${{ steps.package.outputs.bundle_executable }}"
+          spctl -a -t exec -vv "${{ steps.package.outputs.bundle_executable }}" || true
+
+      - name: Repackage signed macOS archive
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          ARCHIVE_PATH="${{ steps.package.outputs.archive_path }}"
+          STAGING_DIR="$(dirname "${{ steps.package.outputs.bundle_dir }}")"
+          rm -f "$ARCHIVE_PATH"
+          ditto -c -k --keepParent "$STAGING_DIR" "$ARCHIVE_PATH"
+
       - name: Smoke test packaged help output
         shell: bash
         run: |
           "${{ steps.package.outputs.bundle_executable }}" --help
+
+      - name: Restore App Store Connect key
+        if: runner.os == 'macOS'
+        env:
+          APPSTORE_CONNECT_API_KEY_P8_BASE64: ${{ secrets.APPSTORE_CONNECT_API_KEY_P8_BASE64 }}
+        shell: bash
+        run: |
+          echo "$APPSTORE_CONNECT_API_KEY_P8_BASE64" | base64 --decode > AuthKey.p8
+
+      - name: Notarise macOS archive
+        if: runner.os == 'macOS'
+        env:
+          APPSTORE_CONNECT_KEY_ID: ${{ vars.APPSTORE_CONNECT_KEY_ID || secrets.APPSTORE_CONNECT_KEY_ID }}
+          APPSTORE_CONNECT_ISSUER_ID: ${{ vars.APPSTORE_CONNECT_ISSUER_ID || secrets.APPSTORE_CONNECT_ISSUER_ID }}
+        shell: bash
+        run: |
+          xcrun notarytool submit "${{ steps.package.outputs.archive_path }}" \
+            --key AuthKey.p8 \
+            --key-id "$APPSTORE_CONNECT_KEY_ID" \
+            --issuer "$APPSTORE_CONNECT_ISSUER_ID" \
+            --wait
 
       - name: Real backend smoke after packaging
         if: matrix.run_real_smoke
@@ -93,6 +178,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-24.04
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
     steps:
       - name: Download packaged artefacts
@@ -105,3 +192,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: release-artifacts/*
+
+      - name: Send Slack notification
+        if: env.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v2.1.1
+        with:
+          webhook: ${{ env.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "🚀 bitloops-embeddings ${{ github.ref_name }} has been released!"
