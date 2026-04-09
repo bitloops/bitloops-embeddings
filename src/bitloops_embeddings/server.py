@@ -137,6 +137,8 @@ def run_server(app: FastAPI, *, host: str, port: int, log_level: str) -> None:
             port=port,
             log_level=log_level.lower(),
             access_log=False,
+            log_config=None,
+            use_colors=False,
         )
     )
     server.run()
@@ -146,4 +148,3 @@ def run_server(app: FastAPI, *, host: str, port: int, log_level: str) -> None:
             code="startup_error",
             status_code=500,
         )
-

@@ -33,3 +33,4 @@ jobs:
         run: |
           bitloops-embeddings --help
           bitloops-embeddings describe --model bge-m3
+          bitloops-embeddings daemon --help

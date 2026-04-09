@@ -16,6 +16,7 @@ def test_help_lists_public_commands() -> None:
     assert "embed" in result.stdout
     assert "serve" in result.stdout
     assert "describe" in result.stdout
+    assert "daemon" in result.stdout
 
 
 def test_embed_returns_json_to_stdout_and_output_file(

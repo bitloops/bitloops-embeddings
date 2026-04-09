@@ -8,6 +8,7 @@ import typer
 
 from bitloops_embeddings.backend.base import EmbeddingBackend
 from bitloops_embeddings.cache import ensure_cache_dir, resolve_cache_dir
+from bitloops_embeddings.daemon import run_daemon
 from bitloops_embeddings.errors import BitloopsEmbeddingsError
 from bitloops_embeddings.logging_utils import configure_logging, log_event
 from bitloops_embeddings.models import EmbeddingResponse, RuntimeInfo
@@ -37,6 +38,10 @@ class LogLevel(str, Enum):
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
+
+
+class Transport(str, Enum):
+    STDIO = "stdio"
 
 
 def main() -> None:
@@ -109,14 +114,22 @@ def serve(
         LogLevel,
         typer.Option("--log-level", help="Server log verbosity.", case_sensitive=False),
     ] = LogLevel.INFO,
+    log_file: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--log-file",
+            help="Optional log file path. Defaults to the OS log sink for long-lived modes.",
+            dir_okay=False,
+            writable=True,
+        ),
+    ] = None,
     max_batch_size: Annotated[
         int,
         typer.Option("--max-batch-size", help="Maximum texts accepted by the /embed endpoint."),
     ] = 32,
 ) -> None:
-    configure_logging(log_level.value)
-
     try:
+        configure_logging(log_level.value, log_file=log_file, prefer_os_log=True)
         backend = _build_backend(model=model, cache_dir=cache_dir)
         backend.load()
         app_instance = create_app(backend, max_batch_size=max_batch_size)
@@ -128,6 +141,53 @@ def serve(
             port=port,
         )
         run_server(app_instance, host=host, port=port, log_level=log_level.value)
+    except BitloopsEmbeddingsError as exc:
+        _exit_with_error(exc)
+    except Exception as exc:
+        _exit_with_error(BitloopsEmbeddingsError(f"Unexpected runtime error: {exc}"))
+
+
+@app.command()
+def daemon(
+    model: Annotated[str, typer.Option("--model", help="Public model identifier.")],
+    transport: Annotated[
+        Transport,
+        typer.Option("--transport", help="IPC transport.", case_sensitive=False),
+    ] = Transport.STDIO,
+    cache_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--cache-dir",
+            help="Override the model cache directory.",
+            file_okay=False,
+            dir_okay=True,
+            writable=True,
+        ),
+    ] = None,
+    log_level: Annotated[
+        LogLevel,
+        typer.Option("--log-level", help="Daemon log verbosity.", case_sensitive=False),
+    ] = LogLevel.INFO,
+    log_file: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--log-file",
+            help="Optional log file path. Defaults to the OS log sink for long-lived modes.",
+            dir_okay=False,
+            writable=True,
+        ),
+    ] = None,
+) -> None:
+    try:
+        configure_logging(log_level.value, log_file=log_file, prefer_os_log=True)
+        if transport is not Transport.STDIO:
+            raise typer.BadParameter("Only stdio transport is supported in v1.")
+        backend = _build_backend(model=model, cache_dir=cache_dir)
+        raise typer.Exit(code=run_daemon(backend))
+    except typer.BadParameter:
+        raise
+    except typer.Exit:
+        raise
     except BitloopsEmbeddingsError as exc:
         _exit_with_error(exc)
     except Exception as exc:
@@ -180,6 +240,9 @@ def _emit_json(payload: str, *, output: Optional[Path]) -> None:
 
 
 def _exit_with_error(exc: BitloopsEmbeddingsError) -> None:
-    log_event("fatal_error", code=exc.code, message=str(exc))
+    try:
+        log_event("fatal_error", code=exc.code, message=str(exc))
+    except Exception:
+        pass
     typer.echo(f"Error: {exc}", err=True)
     raise typer.Exit(code=1)

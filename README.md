@@ -4,6 +4,7 @@
 
 - a one-shot CLI for simple embedding requests
 - a long-lived local HTTP server for repeated requests
+- a long-lived stdio daemon for process-managed IPC
 - release packaging for major desktop and server operating systems
 
 The first release is intentionally operational rather than retrieval-quality-complete. It focuses on a stable interface, model bootstrapping, hello-world inference, and releasable artefacts.
@@ -105,6 +106,15 @@ Override the bind target:
 bitloops-embeddings serve --model bge-m3 --host 127.0.0.1 --port 7719
 ```
 
+Configure logging for long-lived modes:
+
+```bash
+bitloops-embeddings serve \
+  --model bge-m3 \
+  --log-level debug \
+  --log-file ./bitloops-embeddings.log
+```
+
 ### HTTP API
 
 Health:
@@ -145,6 +155,56 @@ Error shape:
   }
 }
 ```
+
+## Daemon usage
+
+Start the stdio daemon:
+
+```bash
+bitloops-embeddings daemon --model bge-m3
+```
+
+The daemon:
+
+- loads the model once and keeps it warm
+- reads newline-delimited JSON requests from `stdin`
+- writes newline-delimited JSON protocol responses only to `stdout`
+- writes logs and diagnostics to the configured log sink or, if needed, to `stderr`
+
+Use a custom log file:
+
+```bash
+bitloops-embeddings daemon \
+  --model bge-m3 \
+  --log-level info \
+  --log-file ./bitloops-embeddings-daemon.log
+```
+
+Ready event:
+
+```json
+{"event":"ready","protocol":1,"capabilities":["embed","ping","health","shutdown"]}
+```
+
+Example request:
+
+```json
+{"id":"1","cmd":"embed","texts":["hello","world"],"model":"bge-m3"}
+```
+
+Example response:
+
+```json
+{"id":"1","ok":true,"vectors":[[0.12,0.98],[-0.44,0.07]],"model":"bge-m3"}
+```
+
+Example error:
+
+```json
+{"id":"7","ok":false,"error":{"code":"UNKNOWN_COMMAND","message":"unsupported cmd: frobnicate"}}
+```
+
+The daemon exits cleanly on `shutdown` or when `stdin` reaches EOF.
 
 ## Cache directory resolution
 
@@ -198,5 +258,7 @@ The repository includes two workflows:
 ## Troubleshooting
 
 - The first `embed` or `serve` invocation downloads model files into the local cache. This can take a while on a cold machine.
+- The first `daemon` invocation also downloads model files into the local cache if they are not already present.
 - If model loading fails, check network access to Hugging Face and confirm the cache directory is writable.
+- Long-lived modes support `--log-level` and `--log-file`. Without `--log-file`, `serve` and `daemon` use a best-effort OS log sink and fall back to `stderr` if the native sink is unavailable.
 - The runtime does not log input texts by default.

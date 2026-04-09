@@ -25,6 +25,9 @@ class FakeBackend:
         self._load_error = load_error
         self._embed_error = embed_error
         self._loaded = False
+        self.load_calls = 0
+        self.embed_calls = 0
+        self.close_calls = 0
 
     @property
     def model_id(self) -> str:
@@ -38,16 +41,28 @@ class FakeBackend:
     def dimensions(self) -> int:
         return self._dimensions
 
+    @property
+    def is_loaded(self) -> bool:
+        return self._loaded
+
     def load(self) -> None:
+        if self._loaded:
+            return
+        self.load_calls += 1
         if self._load_error is not None:
             raise self._load_error
         self._loaded = True
 
     def embed(self, texts: list[str]) -> list[list[float]]:
+        self.embed_calls += 1
         self.load()
         if self._embed_error is not None:
             raise self._embed_error
         return [list(self._vector) for _ in texts]
+
+    def close(self) -> None:
+        self.close_calls += 1
+        self._loaded = False
 
 
 def register_fake_model(

@@ -34,8 +34,12 @@ class SentenceTransformersBackend:
     def dimensions(self) -> int:
         return self._dimensions
 
+    @property
+    def is_loaded(self) -> bool:
+        return self._model is not None
+
     def load(self) -> None:
-        if self._model is not None:
+        if self.is_loaded:
             return
 
         try:
@@ -90,3 +94,6 @@ class SentenceTransformersBackend:
         if hasattr(vectors, "tolist"):
             return vectors.tolist()
         return [[float(value) for value in vector] for vector in vectors]
+
+    def close(self) -> None:
+        self._model = None
