@@ -64,15 +64,6 @@ jobs:
         shell: bash
         run: python scripts/real_backend_smoke.py --binary bitloops-embeddings
 
-      - name: Build packaged archive
-        id: package
-        shell: bash
-        run: |
-          python scripts/package_release.py \
-            --target "${{ matrix.target }}" \
-            --archive-dir build/artifacts \
-            --github-output "${GITHUB_OUTPUT}"
-
       - name: Import Apple signing certificate
         if: runner.os == 'macOS'
         env:
@@ -99,26 +90,16 @@ jobs:
             -k temp123 \
             build.keychain
 
-      - name: Sign macOS packaged bundle
-        if: runner.os == 'macOS'
+      - name: Build packaged archive
+        id: package
         env:
           APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY || secrets.APPLE_SIGNING_IDENTITY }}
         shell: bash
         run: |
-          BUNDLE_DIR="${{ steps.package.outputs.bundle_dir }}"
-          BUNDLE_EXECUTABLE="${{ steps.package.outputs.bundle_executable }}"
-
-          while IFS= read -r -d '' path; do
-            if file "$path" | grep -q 'Mach-O'; then
-              codesign --force --options runtime --timestamp \
-                --sign "$APPLE_SIGNING_IDENTITY" \
-                "$path"
-            fi
-          done < <(find "$BUNDLE_DIR" -type f -print0)
-
-          codesign --force --options runtime --timestamp \
-            --sign "$APPLE_SIGNING_IDENTITY" \
-            "$BUNDLE_EXECUTABLE"
+          python scripts/package_release.py \
+            --target "${{ matrix.target }}" \
+            --archive-dir build/artifacts \
+            --github-output "${GITHUB_OUTPUT}"
 
       - name: Verify macOS packaged signature
         if: runner.os == 'macOS'
@@ -127,15 +108,6 @@ jobs:
           codesign --verify --verbose=4 "${{ steps.package.outputs.bundle_executable }}"
           codesign --display --verbose=4 "${{ steps.package.outputs.bundle_executable }}"
           spctl -a -t exec -vv "${{ steps.package.outputs.bundle_executable }}" || true
-
-      - name: Repackage signed macOS archive
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          ARCHIVE_PATH="${{ steps.package.outputs.archive_path }}"
-          STAGING_DIR="$(dirname "${{ steps.package.outputs.bundle_dir }}")"
-          rm -f "$ARCHIVE_PATH"
-          ditto -c -k --keepParent "$STAGING_DIR" "$ARCHIVE_PATH"
 
       - name: Smoke test packaged help output
         shell: bash

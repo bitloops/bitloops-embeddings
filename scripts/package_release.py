@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import platform
 import shutil
 import subprocess
@@ -83,7 +84,11 @@ def build_release(*, version: str, target: str, archive_dir: Path) -> tuple[Path
     pyinstaller_dist.mkdir(parents=True, exist_ok=True)
     pyinstaller_work.mkdir(parents=True, exist_ok=True)
 
-    run_pyinstaller(pyinstaller_dist=pyinstaller_dist, pyinstaller_work=pyinstaller_work)
+    run_pyinstaller(
+        pyinstaller_dist=pyinstaller_dist,
+        pyinstaller_work=pyinstaller_work,
+        codesign_identity=os.environ.get("APPLE_SIGNING_IDENTITY"),
+    )
 
     shutil.copytree(pyinstaller_dist / PACKAGE_NAME, bundle_dir)
     shutil.copy2(ROOT / "README.md", staging_dir / "README.md")
@@ -105,7 +110,12 @@ def build_release(*, version: str, target: str, archive_dir: Path) -> tuple[Path
     return archive_path, bundle_dir, bundle_executable
 
 
-def run_pyinstaller(*, pyinstaller_dist: Path, pyinstaller_work: Path) -> None:
+def run_pyinstaller(
+    *,
+    pyinstaller_dist: Path,
+    pyinstaller_work: Path,
+    codesign_identity: str | None = None,
+) -> None:
     command = [
         sys.executable,
         "-m",
@@ -122,6 +132,9 @@ def run_pyinstaller(*, pyinstaller_dist: Path, pyinstaller_work: Path) -> None:
         "--paths",
         str(ROOT / "src"),
     ]
+
+    if sys.platform == "darwin" and codesign_identity:
+        command.extend(["--codesign-identity", codesign_identity])
 
     for package in PYINSTALLER_PACKAGES:
         command.extend(["--collect-all", package])
