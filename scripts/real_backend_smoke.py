@@ -11,6 +11,9 @@ from pathlib import Path
 from urllib import error, request
 
 
+SMOKE_RETRY_DELAYS_SECONDS = (10, 20, 40)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run a real backend smoke test.")
     parser.add_argument(
@@ -21,11 +24,28 @@ def main() -> None:
     args = parser.parse_args()
 
     binary = args.binary
-    port = reserve_free_port()
+    run_with_retries("embed smoke", lambda: run_embed_smoke(binary))
+    run_with_retries("server smoke", lambda: run_server_smoke(binary, reserve_free_port()))
+    run_with_retries("daemon smoke", lambda: run_daemon_smoke(binary))
 
-    run_embed_smoke(binary)
-    run_server_smoke(binary, port)
-    run_daemon_smoke(binary)
+
+def run_with_retries(name: str, operation) -> None:
+    total_attempts = len(SMOKE_RETRY_DELAYS_SECONDS) + 1
+    for attempt in range(1, total_attempts + 1):
+        try:
+            operation()
+            return
+        except RuntimeError as exc:
+            if attempt >= total_attempts:
+                raise
+
+            delay_seconds = SMOKE_RETRY_DELAYS_SECONDS[attempt - 1]
+            print(
+                f"{name} failed on attempt {attempt}/{total_attempts}: {exc}\nRetrying in {delay_seconds}s...",
+                file=sys.stderr,
+                flush=True,
+            )
+            time.sleep(delay_seconds)
 
 
 def run_embed_smoke(binary: str) -> None:

@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import logging
+import time
 from pathlib import Path
 from typing import Any
 
 from bitloops_embeddings.errors import BackendLoadError, InferenceError
-from bitloops_embeddings.logging_utils import log_event
+from bitloops_embeddings.logging_utils import LOGGER_NAME, log_event
+
+
+MODEL_LOAD_RETRY_DELAYS_SECONDS = (5, 10, 20)
 
 
 class SentenceTransformersBackend:
@@ -56,19 +61,36 @@ class SentenceTransformersBackend:
             upstream_model_id=self._upstream_model_id,
             cache_dir=self._cache_dir,
         )
-        try:
-            self._model = SentenceTransformer(
-                self._upstream_model_id,
-                cache_folder=str(self._cache_dir),
-                device="cpu",
-            )
-            detected_dimensions = self._model.get_sentence_embedding_dimension()
-            if detected_dimensions is not None:
-                self._dimensions = int(detected_dimensions)
-        except Exception as exc:
-            raise BackendLoadError(
-                f"Failed to load model '{self.model_id}' from '{self._upstream_model_id}'."
-            ) from exc
+        max_attempts = len(MODEL_LOAD_RETRY_DELAYS_SECONDS) + 1
+        for attempt in range(1, max_attempts + 1):
+            try:
+                self._model = SentenceTransformer(
+                    self._upstream_model_id,
+                    cache_folder=str(self._cache_dir),
+                    device="cpu",
+                )
+                detected_dimensions = self._model.get_sentence_embedding_dimension()
+                if detected_dimensions is not None:
+                    self._dimensions = int(detected_dimensions)
+                break
+            except Exception as exc:
+                self._model = None
+                if attempt >= max_attempts or not _is_retryable_load_exception(exc):
+                    raise BackendLoadError(
+                        f"Failed to load model '{self.model_id}' from '{self._upstream_model_id}'."
+                    ) from exc
+
+                delay_seconds = MODEL_LOAD_RETRY_DELAYS_SECONDS[attempt - 1]
+                logging.getLogger(LOGGER_NAME).warning(
+                    "event=model_load_retry model_id=%s backend=%s attempt=%s max_attempts=%s delay_seconds=%s reason=%s",
+                    self.model_id,
+                    self.backend_name,
+                    attempt,
+                    max_attempts,
+                    delay_seconds,
+                    str(exc),
+                )
+                time.sleep(delay_seconds)
 
         log_event(
             "model_load_complete",
@@ -97,3 +119,23 @@ class SentenceTransformersBackend:
 
     def close(self) -> None:
         self._model = None
+
+
+def _is_retryable_load_exception(exc: Exception) -> bool:
+    message = str(exc).lower()
+    retryable_markers = (
+        "http error 500",
+        "http error 502",
+        "http error 503",
+        "http error 504",
+        "connection error",
+        "connection aborted",
+        "connection reset",
+        "read timed out",
+        "timed out",
+        "temporarily unavailable",
+        "temporary failure",
+        "service unavailable",
+        "too many requests",
+    )
+    return any(marker in message for marker in retryable_markers)
