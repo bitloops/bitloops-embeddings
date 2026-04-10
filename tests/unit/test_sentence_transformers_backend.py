@@ -5,6 +5,7 @@ from types import ModuleType
 
 from bitloops_embeddings.backend.sentence_transformers_backend import (
     SentenceTransformersBackend,
+    _configure_tqdm_lock_for_single_process,
     resolve_inference_device,
 )
 
@@ -21,6 +22,14 @@ class FakeSentenceTransformer:
 
     def get_sentence_embedding_dimension(self) -> int:
         return 1024
+
+
+class FakeTqdm:
+    lock = None
+
+    @classmethod
+    def set_lock(cls, lock) -> None:
+        cls.lock = lock
 
 
 def test_sentence_transformers_backend_retries_transient_load_failures(
@@ -47,6 +56,26 @@ def test_sentence_transformers_backend_retries_transient_load_failures(
     assert backend.dimensions == 1024
     assert FakeSentenceTransformer.attempts == 3
     assert FakeSentenceTransformer.last_device == "cpu"
+
+
+def test_configure_tqdm_lock_uses_thread_lock(monkeypatch) -> None:
+    fake_tqdm_package = ModuleType("tqdm")
+    fake_tqdm_autonotebook = ModuleType("tqdm.autonotebook")
+    fake_tqdm_autonotebook.tqdm = FakeTqdm
+    FakeTqdm.lock = None
+
+    monkeypatch.setitem(sys.modules, "tqdm", fake_tqdm_package)
+    monkeypatch.setitem(sys.modules, "tqdm.autonotebook", fake_tqdm_autonotebook)
+    monkeypatch.setattr(
+        "bitloops_embeddings.backend.sentence_transformers_backend._TQDM_THREAD_LOCK_CONFIGURED",
+        False,
+    )
+
+    _configure_tqdm_lock_for_single_process()
+
+    assert FakeTqdm.lock is not None
+    assert hasattr(FakeTqdm.lock, "acquire")
+    assert hasattr(FakeTqdm.lock, "release")
 
 
 def test_resolve_inference_device_prefers_mps_on_apple_silicon(monkeypatch) -> None:

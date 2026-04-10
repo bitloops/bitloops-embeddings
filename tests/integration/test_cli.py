@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from bitloops_embeddings.cli import app
+from bitloops_embeddings.version import __version__
 from typer.testing import CliRunner
 
 
@@ -51,7 +52,7 @@ def test_embed_returns_json_to_stdout_and_output_file(
     assert stdout_payload["model_id"] == "bge-m3"
     assert stdout_payload["dimensions"] == 3
     assert stdout_payload["embeddings"][0]
-    assert stdout_payload["runtime"]["version"] == "0.1.1"
+    assert stdout_payload["runtime"]["version"] == __version__
     assert file_payload == stdout_payload
 
 

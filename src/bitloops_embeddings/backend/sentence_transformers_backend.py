@@ -4,6 +4,7 @@ import logging
 import platform
 import time
 from pathlib import Path
+from threading import RLock
 from typing import Any
 
 from bitloops_embeddings.errors import BackendLoadError, InferenceError
@@ -11,6 +12,7 @@ from bitloops_embeddings.logging_utils import LOGGER_NAME, log_event
 
 
 MODEL_LOAD_RETRY_DELAYS_SECONDS = (5, 10, 20)
+_TQDM_THREAD_LOCK_CONFIGURED = False
 
 
 class SentenceTransformersBackend:
@@ -111,6 +113,7 @@ class SentenceTransformersBackend:
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         self.load()
+        _configure_tqdm_lock_for_single_process()
         try:
             vectors = self._model.encode(
                 texts,
@@ -164,6 +167,25 @@ def _iter_exception_messages(exc: Exception) -> list[str]:
         current = current.__cause__ or current.__context__
 
     return messages
+
+
+def _configure_tqdm_lock_for_single_process() -> None:
+    global _TQDM_THREAD_LOCK_CONFIGURED
+    if _TQDM_THREAD_LOCK_CONFIGURED:
+        return
+
+    try:
+        from tqdm.autonotebook import tqdm as auto_tqdm
+    except ImportError:
+        return
+
+    # sentence-transformers always routes encode batches through tqdm, and
+    # tqdm's default write lock uses multiprocessing.RLock on macOS/Linux.
+    # That creates a semaphore even when progress bars are disabled, which can
+    # surface noisy resource_tracker warnings at interpreter shutdown on
+    # Python 3.12. A thread lock is sufficient for this single-process runtime.
+    auto_tqdm.set_lock(RLock())
+    _TQDM_THREAD_LOCK_CONFIGURED = True
 
 
 def resolve_inference_device() -> str:

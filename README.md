@@ -25,7 +25,7 @@ The command and HTTP layers are written against an internal backend registry so 
 
 ## Acceleration support
 
-Current hardware acceleration support is intentionally limited in `v0.1.1`:
+Current hardware acceleration support is intentionally limited in `v0.1.2`:
 
 - `aarch64-apple-darwin`:
   - uses Apple Metal Performance Shaders (`mps`) automatically when available
@@ -86,7 +86,7 @@ Example response:
   "embeddings": [[0.123, -0.456, 0.789]],
   "runtime": {
     "name": "bitloops-embeddings",
-    "version": "0.1.1"
+    "version": "0.1.2"
   }
 }
 ```
@@ -160,7 +160,7 @@ Response shape:
   "embeddings": [[0.123, -0.456, 0.789]],
   "runtime": {
     "name": "bitloops-embeddings",
-    "version": "0.1.1"
+    "version": "0.1.2"
   }
 }
 ```

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from bitloops_embeddings.models import EmbeddingResponse, ErrorDetail, ErrorResponse, RuntimeInfo
+from bitloops_embeddings.version import __version__
 
 
 def test_embedding_response_serialises_runtime_metadata() -> None:
@@ -10,7 +11,7 @@ def test_embedding_response_serialises_runtime_metadata() -> None:
         model_id="bge-m3",
         dimensions=3,
         embeddings=[[0.1, -0.2, 0.3]],
-        runtime=RuntimeInfo(name="bitloops-embeddings", version="0.1.1"),
+        runtime=RuntimeInfo(name="bitloops-embeddings", version=__version__),
     )
 
     payload = json.loads(response.model_dump_json())
