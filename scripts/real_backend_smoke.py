@@ -21,12 +21,19 @@ def main() -> None:
         required=True,
         help="Executable to invoke. This may be a console script name or an absolute path.",
     )
+    parser.add_argument(
+        "--device",
+        default="auto",
+        choices=("auto", "cpu", "mps"),
+        help="Inference device override to pass through to the runtime.",
+    )
     args = parser.parse_args()
 
     binary = args.binary
-    run_with_retries("embed smoke", lambda: run_embed_smoke(binary))
-    run_with_retries("server smoke", lambda: run_server_smoke(binary, reserve_free_port()))
-    run_with_retries("daemon smoke", lambda: run_daemon_smoke(binary))
+    device = args.device
+    run_with_retries("embed smoke", lambda: run_embed_smoke(binary, device))
+    run_with_retries("server smoke", lambda: run_server_smoke(binary, reserve_free_port(), device))
+    run_with_retries("daemon smoke", lambda: run_daemon_smoke(binary, device))
 
 
 def run_with_retries(name: str, operation) -> None:
@@ -48,9 +55,9 @@ def run_with_retries(name: str, operation) -> None:
             time.sleep(delay_seconds)
 
 
-def run_embed_smoke(binary: str) -> None:
+def run_embed_smoke(binary: str, device: str) -> None:
     completed = subprocess.run(
-        [binary, "embed", "--model", "bge-m3", "--input", "Hello World"],
+        [binary, "embed", "--model", "bge-m3", "--input", "Hello World", "--device", device],
         check=False,
         capture_output=True,
         text=True,
@@ -69,7 +76,7 @@ def run_embed_smoke(binary: str) -> None:
         raise RuntimeError("Embed smoke returned an empty embedding vector.")
 
 
-def run_server_smoke(binary: str, port: int) -> None:
+def run_server_smoke(binary: str, port: int, device: str) -> None:
     with tempfile.TemporaryDirectory(prefix="bitloops-embeddings-serve-logs-") as temp_dir:
         log_file = Path(temp_dir) / "serve.log"
         process = subprocess.Popen(
@@ -82,6 +89,8 @@ def run_server_smoke(binary: str, port: int) -> None:
                 "127.0.0.1",
                 "--port",
                 str(port),
+                "--device",
+                device,
                 "--log-file",
                 str(log_file),
             ],
@@ -109,7 +118,7 @@ def run_server_smoke(binary: str, port: int) -> None:
                 process.wait(timeout=5)
 
 
-def run_daemon_smoke(binary: str) -> None:
+def run_daemon_smoke(binary: str, device: str) -> None:
     with tempfile.TemporaryDirectory(prefix="bitloops-embeddings-daemon-logs-") as temp_dir:
         log_file = Path(temp_dir) / "daemon.log"
         process = subprocess.Popen(
@@ -118,6 +127,8 @@ def run_daemon_smoke(binary: str) -> None:
                 "daemon",
                 "--model",
                 "bge-m3",
+                "--device",
+                device,
                 "--log-file",
                 str(log_file),
             ],

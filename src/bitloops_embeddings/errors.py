@@ -24,6 +24,11 @@ class UnsupportedModelError(BitloopsEmbeddingsError):
     default_status_code = 400
 
 
+class UnsupportedDeviceError(BitloopsEmbeddingsError):
+    default_code = "unsupported_device"
+    default_status_code = 400
+
+
 class BackendLoadError(BitloopsEmbeddingsError):
     default_code = "backend_load_error"
     default_status_code = 500

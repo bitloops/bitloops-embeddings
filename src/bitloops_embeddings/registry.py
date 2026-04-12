@@ -11,7 +11,7 @@ from bitloops_embeddings.backend.sentence_transformers_backend import (
 from bitloops_embeddings.errors import UnsupportedModelError
 
 
-BackendFactory = Callable[[Path], EmbeddingBackend]
+BackendFactory = Callable[[Path, str], EmbeddingBackend]
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,8 +22,8 @@ class ModelSpec:
     dimensions: int
     factory: BackendFactory
 
-    def create_backend(self, cache_dir: Path) -> EmbeddingBackend:
-        return self.factory(cache_dir)
+    def create_backend(self, cache_dir: Path, requested_device: str = "auto") -> EmbeddingBackend:
+        return self.factory(cache_dir, requested_device)
 
 
 def _default_registry() -> dict[str, ModelSpec]:
@@ -33,11 +33,12 @@ def _default_registry() -> dict[str, ModelSpec]:
             upstream_model_id="BAAI/bge-m3",
             backend_name="sentence-transformers",
             dimensions=1024,
-            factory=lambda cache_dir: SentenceTransformersBackend(
+            factory=lambda cache_dir, requested_device: SentenceTransformersBackend(
                 model_id="bge-m3",
                 upstream_model_id="BAAI/bge-m3",
                 cache_dir=cache_dir,
                 dimensions=1024,
+                requested_device=requested_device,
             ),
         ),
     }
@@ -63,4 +64,3 @@ def register_model(spec: ModelSpec) -> None:
 def reset_model_registry() -> None:
     global _MODEL_REGISTRY
     _MODEL_REGISTRY = _default_registry()
-

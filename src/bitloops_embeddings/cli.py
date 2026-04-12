@@ -40,6 +40,12 @@ class LogLevel(str, Enum):
     ERROR = "error"
 
 
+class Device(str, Enum):
+    AUTO = "auto"
+    CPU = "cpu"
+    MPS = "mps"
+
+
 class Transport(str, Enum):
     STDIO = "stdio"
 
@@ -66,6 +72,14 @@ def embed(
             writable=True,
         ),
     ] = None,
+    device: Annotated[
+        Device,
+        typer.Option(
+            "--device",
+            help="Inference device. auto prefers MPS when available, otherwise CPU.",
+            case_sensitive=False,
+        ),
+    ] = Device.AUTO,
     output: Annotated[
         Optional[Path],
         typer.Option(
@@ -81,7 +95,7 @@ def embed(
         raise typer.BadParameter("Only JSON output is supported in v1.")
 
     try:
-        backend = _build_backend(model=model, cache_dir=cache_dir)
+        backend = _build_backend(model=model, cache_dir=cache_dir, device=device)
         response = EmbeddingResponse(
             model_id=backend.model_id,
             dimensions=backend.dimensions,
@@ -110,6 +124,14 @@ def serve(
             writable=True,
         ),
     ] = None,
+    device: Annotated[
+        Device,
+        typer.Option(
+            "--device",
+            help="Inference device. auto prefers MPS when available, otherwise CPU.",
+            case_sensitive=False,
+        ),
+    ] = Device.AUTO,
     log_level: Annotated[
         LogLevel,
         typer.Option("--log-level", help="Server log verbosity.", case_sensitive=False),
@@ -130,7 +152,7 @@ def serve(
 ) -> None:
     try:
         configure_logging(log_level.value, log_file=log_file, prefer_os_log=True)
-        backend = _build_backend(model=model, cache_dir=cache_dir)
+        backend = _build_backend(model=model, cache_dir=cache_dir, device=device)
         backend.load()
         app_instance = create_app(backend, max_batch_size=max_batch_size)
         log_event(
@@ -164,6 +186,14 @@ def daemon(
             writable=True,
         ),
     ] = None,
+    device: Annotated[
+        Device,
+        typer.Option(
+            "--device",
+            help="Inference device. auto prefers MPS when available, otherwise CPU.",
+            case_sensitive=False,
+        ),
+    ] = Device.AUTO,
     log_level: Annotated[
         LogLevel,
         typer.Option("--log-level", help="Daemon log verbosity.", case_sensitive=False),
@@ -182,7 +212,7 @@ def daemon(
         configure_logging(log_level.value, log_file=log_file, prefer_os_log=True)
         if transport is not Transport.STDIO:
             raise typer.BadParameter("Only stdio transport is supported in v1.")
-        backend = _build_backend(model=model, cache_dir=cache_dir)
+        backend = _build_backend(model=model, cache_dir=cache_dir, device=device)
         raise typer.Exit(code=run_daemon(backend))
     except typer.BadParameter:
         raise
@@ -226,10 +256,15 @@ def describe(
         _exit_with_error(BitloopsEmbeddingsError(f"Unexpected runtime error: {exc}"))
 
 
-def _build_backend(*, model: str, cache_dir: Optional[Path]) -> EmbeddingBackend:
+def _build_backend(
+    *,
+    model: str,
+    cache_dir: Optional[Path],
+    device: Device = Device.AUTO,
+) -> EmbeddingBackend:
     resolved_cache_dir = ensure_cache_dir(resolve_cache_dir(cache_dir))
     spec = get_model_spec(model)
-    return spec.create_backend(resolved_cache_dir)
+    return spec.create_backend(resolved_cache_dir, requested_device=device.value)
 
 
 def _emit_json(payload: str, *, output: Optional[Path]) -> None:

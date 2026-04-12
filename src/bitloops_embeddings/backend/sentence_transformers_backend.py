@@ -7,7 +7,11 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
-from bitloops_embeddings.errors import BackendLoadError, InferenceError
+from bitloops_embeddings.errors import (
+    BackendLoadError,
+    InferenceError,
+    UnsupportedDeviceError,
+)
 from bitloops_embeddings.logging_utils import LOGGER_NAME, log_event
 
 
@@ -23,13 +27,15 @@ class SentenceTransformersBackend:
         upstream_model_id: str,
         cache_dir: Path,
         dimensions: int,
+        requested_device: str = "auto",
     ) -> None:
         self._model_id = model_id
         self._upstream_model_id = upstream_model_id
         self._cache_dir = cache_dir
         self._dimensions = dimensions
         self._model: Any = None
-        self._device = resolve_inference_device()
+        self._requested_device = requested_device
+        self._device = resolve_inference_device(requested_device=requested_device)
 
     @property
     def model_id(self) -> str:
@@ -188,28 +194,53 @@ def _configure_tqdm_lock_for_single_process() -> None:
     _TQDM_THREAD_LOCK_CONFIGURED = True
 
 
-def resolve_inference_device() -> str:
-    if platform.system() != "Darwin":
+def resolve_inference_device_for_request(requested_device: str) -> str:
+    if requested_device == "auto":
+        return "mps" if _is_mps_available() else "cpu"
+
+    if requested_device == "cpu":
         return "cpu"
 
-    if platform.machine().lower() not in ("arm64", "aarch64"):
-        return "cpu"
+    if requested_device == "mps":
+        unavailable_reason = _resolve_mps_unavailable_reason()
+        if unavailable_reason is None:
+            return "mps"
+        raise UnsupportedDeviceError(
+            f"MPS was requested but is unavailable: {unavailable_reason}"
+        )
+
+    raise UnsupportedDeviceError(
+        f"Unsupported device '{requested_device}'. Supported devices: auto, cpu, mps."
+    )
+
+
+def resolve_inference_device(requested_device: str = "auto") -> str:
+    return resolve_inference_device_for_request(requested_device)
+
+
+def _is_mps_available() -> bool:
+    return _resolve_mps_unavailable_reason() is None
+
+
+def _resolve_mps_unavailable_reason() -> str | None:
+    if platform.system() != "Darwin":
+        return "MPS is only available on macOS."
 
     try:
         import torch
     except ImportError:
-        return "cpu"
+        return "PyTorch is not installed."
 
     mps_backend = getattr(getattr(torch, "backends", None), "mps", None)
     if mps_backend is None:
-        return "cpu"
+        return "the installed PyTorch build does not expose torch.backends.mps."
 
     is_built = getattr(mps_backend, "is_built", None)
     if callable(is_built) and not is_built():
-        return "cpu"
+        return "the installed PyTorch build was not built with MPS support."
 
     is_available = getattr(mps_backend, "is_available", None)
     if callable(is_available) and is_available():
-        return "mps"
+        return None
 
-    return "cpu"
+    return "macOS 12.3 or later and an MPS-enabled GPU are required."

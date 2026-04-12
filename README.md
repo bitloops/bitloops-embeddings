@@ -17,7 +17,7 @@ The initial public model identifier is `bge-m3`.
 - Upstream model id: `BAAI/bge-m3`
 - Backend: `sentence-transformers`
 - Device:
-  - Apple Silicon macOS: `mps` when available, otherwise CPU
+  - macOS: `auto` by default, which selects `mps` when available, otherwise CPU
   - all other current targets: CPU
 - Provisioning: first-run download into a local cache directory
 
@@ -25,19 +25,24 @@ The command and HTTP layers are written against an internal backend registry so 
 
 ## Acceleration support
 
-Current hardware acceleration support is intentionally limited in `v0.1.2`:
+Current hardware acceleration support in `v0.1.3`:
 
 - `aarch64-apple-darwin`:
+  - defaults to `auto`
   - uses Apple Metal Performance Shaders (`mps`) automatically when available
   - falls back to CPU if MPS is unavailable
 - `x86_64-apple-darwin`:
-  - CPU only
+  - defaults to `auto`
+  - uses Apple Metal Performance Shaders (`mps`) automatically when available
+  - falls back to CPU if MPS is unavailable
 - `x86_64-unknown-linux-gnu`:
   - CPU only
 - `aarch64-unknown-linux-gnu`:
   - CPU only
 - `x86_64-pc-windows-msvc`:
   - CPU only
+
+Explicit device override is available on embedding, server, and daemon commands via `--device auto|cpu|mps`.
 
 The current release does not expose CUDA, ROCm, DirectML, or Intel GPU acceleration paths yet.
 
@@ -86,7 +91,7 @@ Example response:
   "embeddings": [[0.123, -0.456, 0.789]],
   "runtime": {
     "name": "bitloops-embeddings",
-    "version": "0.1.2"
+    "version": "0.1.3"
   }
 }
 ```
@@ -98,6 +103,13 @@ bitloops-embeddings embed \
   --model bge-m3 \
   --input "Hello World" \
   --output ./embedding.json
+```
+
+Force CPU or request MPS explicitly:
+
+```bash
+bitloops-embeddings embed --model bge-m3 --input "Hello World" --device cpu
+bitloops-embeddings serve --model bge-m3 --device mps
 ```
 
 Inspect model metadata without loading the model:
@@ -160,7 +172,7 @@ Response shape:
   "embeddings": [[0.123, -0.456, 0.789]],
   "runtime": {
     "name": "bitloops-embeddings",
-    "version": "0.1.2"
+    "version": "0.1.3"
   }
 }
 ```
@@ -258,6 +270,7 @@ Run the real-model smoke test against an installed console script or packaged ex
 
 ```bash
 python scripts/real_backend_smoke.py --binary bitloops-embeddings
+python scripts/real_backend_smoke.py --binary bitloops-embeddings --device mps
 ```
 
 ## GitHub Actions

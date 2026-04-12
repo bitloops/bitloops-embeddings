@@ -12,6 +12,7 @@ class FakeBackend:
         self,
         *,
         cache_dir: Path,
+        requested_device: str = "auto",
         model_id: str = "bge-m3",
         dimensions: int = 3,
         vector: Optional[list[float]] = None,
@@ -19,6 +20,7 @@ class FakeBackend:
         embed_error: Optional[Exception] = None,
     ) -> None:
         self._cache_dir = cache_dir
+        self._requested_device = requested_device
         self._model_id = model_id
         self._dimensions = dimensions
         self._vector = vector or [0.1, -0.2, 0.3]
@@ -66,7 +68,7 @@ class FakeBackend:
 
 
 def register_fake_model(
-    factory: Optional[Callable[[Path], FakeBackend]] = None,
+    factory: Optional[Callable[[Path, str], FakeBackend]] = None,
     *,
     dimensions: int = 3,
 ) -> ModelSpec:
@@ -75,7 +77,14 @@ def register_fake_model(
         upstream_model_id="test/bge-m3",
         backend_name="fake-backend",
         dimensions=dimensions,
-        factory=factory or (lambda cache_dir: FakeBackend(cache_dir=cache_dir, dimensions=dimensions)),
+        factory=factory
+        or (
+            lambda cache_dir, requested_device: FakeBackend(
+                cache_dir=cache_dir,
+                requested_device=requested_device,
+                dimensions=dimensions,
+            )
+        ),
     )
     register_model(spec)
     return spec
@@ -83,8 +92,9 @@ def register_fake_model(
 
 def build_load_failure_model() -> ModelSpec:
     return register_fake_model(
-        factory=lambda cache_dir: FakeBackend(
+        factory=lambda cache_dir, requested_device: FakeBackend(
             cache_dir=cache_dir,
+            requested_device=requested_device,
             load_error=BackendLoadError("Model load failed."),
         )
     )
@@ -92,8 +102,9 @@ def build_load_failure_model() -> ModelSpec:
 
 def build_inference_failure_model() -> ModelSpec:
     return register_fake_model(
-        factory=lambda cache_dir: FakeBackend(
+        factory=lambda cache_dir, requested_device: FakeBackend(
             cache_dir=cache_dir,
+            requested_device=requested_device,
             embed_error=InferenceError("Embedding request failed."),
         )
     )

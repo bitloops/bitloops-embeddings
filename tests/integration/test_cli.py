@@ -5,6 +5,7 @@ from pathlib import Path
 
 from bitloops_embeddings.cli import app
 from bitloops_embeddings.version import __version__
+from tests.support import FakeBackend, register_fake_model
 from typer.testing import CliRunner
 
 
@@ -54,6 +55,40 @@ def test_embed_returns_json_to_stdout_and_output_file(
     assert stdout_payload["embeddings"][0]
     assert stdout_payload["runtime"]["version"] == __version__
     assert file_payload == stdout_payload
+
+
+def test_embed_passes_requested_device_to_backend(tmp_path: Path) -> None:
+    runner = CliRunner()
+    captured_devices: list[str] = []
+
+    register_fake_model(
+        factory=lambda cache_dir, requested_device: (
+            captured_devices.append(requested_device)
+            or FakeBackend(
+                cache_dir=cache_dir,
+                requested_device=requested_device,
+            )
+        )
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "embed",
+            "--model",
+            "bge-m3",
+            "--input",
+            "Hello World",
+            "--cache-dir",
+            str(tmp_path / "cache"),
+            "--device",
+            "cpu",
+        ],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0
+    assert captured_devices == ["cpu"]
 
 
 def test_describe_returns_runtime_metadata(fake_model) -> None:
