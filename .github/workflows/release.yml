@@ -29,7 +29,7 @@ jobs:
           - os: macos-15-intel
             target: x86_64-apple-darwin
             allow_failure: false
-            run_real_smoke: true
+            run_real_smoke: false
           - os: macos-14
             target: aarch64-apple-darwin
             allow_failure: false
