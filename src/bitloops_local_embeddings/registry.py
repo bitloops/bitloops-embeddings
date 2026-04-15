@@ -4,11 +4,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from bitloops_embeddings.backend.base import EmbeddingBackend
-from bitloops_embeddings.backend.sentence_transformers_backend import (
+from bitloops_local_embeddings.backend.base import EmbeddingBackend
+from bitloops_local_embeddings.backend.sentence_transformers_backend import (
     SentenceTransformersBackend,
 )
-from bitloops_embeddings.errors import UnsupportedModelError
+from bitloops_local_embeddings.errors import UnsupportedModelError
 
 
 BackendFactory = Callable[[Path, str], EmbeddingBackend]

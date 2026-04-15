@@ -2,9 +2,17 @@ from __future__ import annotations
 
 import io
 import json
+from pathlib import Path
 
-from bitloops_embeddings.daemon import ProtocolWriter, handle_request, process_request_line, run_daemon
+from bitloops_local_embeddings.daemon import ProtocolWriter, handle_request, process_request_line, run_daemon
 from tests.support import FakeBackend
+
+
+FIXTURES = Path(__file__).resolve().parents[1] / "protocol_fixtures"
+
+
+def load_fixture(name: str) -> dict[str, object]:
+    return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
 class FlushRecordingStream(io.StringIO):
@@ -86,13 +94,15 @@ def test_handle_request_returns_unknown_command(tmp_path) -> None:
 
 def test_run_daemon_reuses_a_single_warm_backend(tmp_path) -> None:
     backend = FakeBackend(cache_dir=tmp_path / "cache")
+    ping_request = load_fixture("ping_request.json")
+    shutdown_request = load_fixture("shutdown_request.json")
     stdin = io.StringIO(
         "\n".join(
             [
-                json.dumps({"id": "1", "cmd": "ping"}),
+                json.dumps(ping_request),
                 json.dumps({"id": "2", "cmd": "embed", "texts": ["hello"]}),
                 json.dumps({"id": "3", "cmd": "embed", "texts": ["world"]}),
-                json.dumps({"id": "4", "cmd": "shutdown"}),
+                json.dumps(shutdown_request),
             ]
         )
         + "\n"
@@ -107,5 +117,6 @@ def test_run_daemon_reuses_a_single_warm_backend(tmp_path) -> None:
     assert backend.embed_calls == 2
     assert backend.close_calls == 1
     messages = [json.loads(line) for line in stdout.getvalue().splitlines()]
-    assert messages[0]["event"] == "ready"
-    assert messages[-1] == {"id": "4", "ok": True}
+    assert messages[0] == load_fixture("ready_event.json")
+    assert messages[1] == load_fixture("ping_response.json")
+    assert messages[-1] == load_fixture("shutdown_response.json")

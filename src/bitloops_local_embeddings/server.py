@@ -5,10 +5,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import uvicorn
 
-from bitloops_embeddings.backend.base import EmbeddingBackend
-from bitloops_embeddings.errors import BitloopsEmbeddingsError, InputValidationError
-from bitloops_embeddings.logging_utils import log_event
-from bitloops_embeddings.models import (
+from bitloops_local_embeddings.backend.base import EmbeddingBackend
+from bitloops_local_embeddings.errors import BitloopsEmbeddingsError, InputValidationError
+from bitloops_local_embeddings.logging_utils import log_event
+from bitloops_local_embeddings.models import (
     DescribeResponse,
     EmbedRequest,
     EmbeddingResponse,
@@ -17,10 +17,10 @@ from bitloops_embeddings.models import (
     HealthResponse,
     RuntimeInfo,
 )
-from bitloops_embeddings.version import __version__
+from bitloops_local_embeddings.version import __version__
 
 
-RUNTIME_NAME = "bitloops-embeddings"
+RUNTIME_NAME = "bitloops-local-embeddings"
 
 
 def create_app(

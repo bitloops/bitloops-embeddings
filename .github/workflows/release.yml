@@ -10,8 +10,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build ${{ matrix.target }}
+  build-local:
+    name: Build local ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.allow_failure }}
     strategy:
@@ -62,7 +62,7 @@ jobs:
       - name: Real backend smoke before packaging
         if: matrix.run_real_smoke
         shell: bash
-        run: python scripts/real_backend_smoke.py --binary bitloops-embeddings
+        run: python scripts/real_backend_smoke.py --binary bitloops-local-embeddings
 
       - name: Switch Linux packaging environment to CPU-only torch
         if: runner.os == 'Linux'
@@ -131,11 +131,6 @@ jobs:
             --archive-dir build/artifacts \
             --github-output "${GITHUB_OUTPUT}"
 
-      - name: Report packaged archive size
-        shell: bash
-        run: |
-          ls -lh "${{ steps.package.outputs.archive_path }}"
-
       - name: Verify macOS packaged signature
         if: runner.os == 'macOS'
         shell: bash
@@ -178,12 +173,85 @@ jobs:
       - name: Upload packaged artefact
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ matrix.target }}
+          name: local-${{ matrix.target }}
+          path: ${{ steps.package.outputs.archive_path }}
+
+  build-platform:
+    name: Build platform ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.allow_failure }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            allow_failure: false
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            allow_failure: true
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            allow_failure: false
+          - os: macos-14
+            target: aarch64-apple-darwin
+            allow_failure: false
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            allow_failure: false
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add Rust target
+        shell: bash
+        run: rustup target add "${{ matrix.target }}"
+
+      - name: Build platform runtime
+        shell: bash
+        run: cargo build --release -p bitloops-platform-embeddings --target "${{ matrix.target }}"
+
+      - name: Package platform runtime
+        id: package
+        shell: bash
+        run: |
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            BINARY_PATH="target/${{ matrix.target }}/release/bitloops-platform-embeddings.exe"
+          else
+            BINARY_PATH="target/${{ matrix.target }}/release/bitloops-platform-embeddings"
+          fi
+
+          python scripts/package_platform_release.py \
+            --target "${{ matrix.target }}" \
+            --binary-path "${BINARY_PATH}" \
+            --archive-dir build/artifacts \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Smoke test packaged help output
+        shell: bash
+        run: |
+          "${{ steps.package.outputs.bundle_executable }}" --help
+
+      - name: Upload packaged artefact
+        uses: actions/upload-artifact@v6
+        with:
+          name: platform-${{ matrix.target }}
           path: ${{ steps.package.outputs.archive_path }}
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs:
+      - build-local
+      - build-platform
     runs-on: ubuntu-24.04
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -196,7 +264,6 @@ jobs:
           merge-multiple: true
 
       - name: Filter release assets to GitHub size limit
-        id: release_assets
         shell: bash
         run: |
           mkdir -p release-upload

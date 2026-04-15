@@ -77,7 +77,7 @@ def run_embed_smoke(binary: str, device: str) -> None:
 
 
 def run_server_smoke(binary: str, port: int, device: str) -> None:
-    with tempfile.TemporaryDirectory(prefix="bitloops-embeddings-serve-logs-") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="bitloops-local-embeddings-serve-logs-") as temp_dir:
         log_file = Path(temp_dir) / "serve.log"
         process = subprocess.Popen(
             [
@@ -119,7 +119,7 @@ def run_server_smoke(binary: str, port: int, device: str) -> None:
 
 
 def run_daemon_smoke(binary: str, device: str) -> None:
-    with tempfile.TemporaryDirectory(prefix="bitloops-embeddings-daemon-logs-") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="bitloops-local-embeddings-daemon-logs-") as temp_dir:
         log_file = Path(temp_dir) / "daemon.log"
         process = subprocess.Popen(
             [

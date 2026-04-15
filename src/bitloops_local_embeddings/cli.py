@@ -6,20 +6,20 @@ from typing import Annotated, Optional
 
 import typer
 
-from bitloops_embeddings.backend.base import EmbeddingBackend
-from bitloops_embeddings.cache import ensure_cache_dir, resolve_cache_dir
-from bitloops_embeddings.daemon import run_daemon
-from bitloops_embeddings.errors import BitloopsEmbeddingsError
-from bitloops_embeddings.logging_utils import configure_logging, log_event
-from bitloops_embeddings.models import EmbeddingResponse, RuntimeInfo
-from bitloops_embeddings.registry import get_model_spec
-from bitloops_embeddings.server import (
+from bitloops_local_embeddings.backend.base import EmbeddingBackend
+from bitloops_local_embeddings.cache import ensure_cache_dir, resolve_cache_dir
+from bitloops_local_embeddings.daemon import run_daemon
+from bitloops_local_embeddings.errors import BitloopsEmbeddingsError
+from bitloops_local_embeddings.logging_utils import configure_logging, log_event
+from bitloops_local_embeddings.models import EmbeddingResponse, RuntimeInfo
+from bitloops_local_embeddings.registry import get_model_spec
+from bitloops_local_embeddings.server import (
     RUNTIME_NAME,
     build_describe_response,
     create_app,
     run_server,
 )
-from bitloops_embeddings.version import __version__
+from bitloops_local_embeddings.version import __version__
 
 
 app = typer.Typer(

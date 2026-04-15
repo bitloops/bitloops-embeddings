@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from bitloops_embeddings.server import create_app
+from bitloops_local_embeddings.server import create_app
 from tests.support import FakeBackend
 
 

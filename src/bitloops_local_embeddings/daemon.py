@@ -7,9 +7,9 @@ import sys
 import time
 from typing import Any, Optional, TextIO
 
-from bitloops_embeddings.backend.base import EmbeddingBackend
-from bitloops_embeddings.errors import BitloopsEmbeddingsError
-from bitloops_embeddings.logging_utils import LOGGER_NAME, flush_logging, log_event
+from bitloops_local_embeddings.backend.base import EmbeddingBackend
+from bitloops_local_embeddings.errors import BitloopsEmbeddingsError
+from bitloops_local_embeddings.logging_utils import LOGGER_NAME, flush_logging, log_event
 
 
 PROTOCOL_VERSION = 1

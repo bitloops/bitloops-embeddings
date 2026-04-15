@@ -7,12 +7,12 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
-from bitloops_embeddings.errors import (
+from bitloops_local_embeddings.errors import (
     BackendLoadError,
     InferenceError,
     UnsupportedDeviceError,
 )
-from bitloops_embeddings.logging_utils import LOGGER_NAME, log_event
+from bitloops_local_embeddings.logging_utils import LOGGER_NAME, log_event
 
 
 MODEL_LOAD_RETRY_DELAYS_SECONDS = (5, 10, 20)

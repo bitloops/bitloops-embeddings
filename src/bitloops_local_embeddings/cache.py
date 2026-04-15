@@ -7,7 +7,7 @@ from typing import Optional
 from platformdirs import user_cache_dir
 
 
-CACHE_ENV_VAR = "BITLOOPS_EMBEDDINGS_CACHE_DIR"
+CACHE_ENV_VAR = "BITLOOPS_LOCAL_EMBEDDINGS_CACHE_DIR"
 
 
 def resolve_cache_dir(explicit_cache_dir: Optional[Path] = None) -> Path:
@@ -18,7 +18,7 @@ def resolve_cache_dir(explicit_cache_dir: Optional[Path] = None) -> Path:
     if env_cache_dir:
         return Path(env_cache_dir).expanduser()
 
-    return Path(user_cache_dir("bitloops-embeddings")).expanduser()
+    return Path(user_cache_dir("bitloops-local-embeddings")).expanduser()
 
 
 def ensure_cache_dir(cache_dir: Path) -> Path:

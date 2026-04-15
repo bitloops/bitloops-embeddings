@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  test-local:
     runs-on: ubuntu-24.04
 
     steps:
@@ -31,6 +31,22 @@ jobs:
 
       - name: Smoke test CLI shape
         run: |
-          bitloops-embeddings --help
-          bitloops-embeddings describe --model bge-m3
-          bitloops-embeddings daemon --help
+          bitloops-local-embeddings --help
+          bitloops-local-embeddings describe --model bge-m3
+          bitloops-local-embeddings daemon --help
+
+  test-platform:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run platform runtime tests
+        run: cargo test -p bitloops-platform-embeddings
+
+      - name: Smoke test platform CLI shape
+        run: cargo run -p bitloops-platform-embeddings -- --help

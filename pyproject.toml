@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "bitloops-embeddings"
+name = "bitloops-local-embeddings"
 description = "Managed local embeddings runtime for Bitloops"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -31,13 +31,13 @@ dev = [
 ]
 
 [project.scripts]
-bitloops-embeddings = "bitloops_embeddings.cli:main"
+bitloops-local-embeddings = "bitloops_local_embeddings.cli:main"
 
 [tool.hatch.version]
-path = "src/bitloops_embeddings/version.py"
+path = "src/bitloops_local_embeddings/version.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/bitloops_embeddings"]
+packages = ["src/bitloops_local_embeddings"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

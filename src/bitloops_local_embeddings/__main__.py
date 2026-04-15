@@ -7,7 +7,7 @@ def run() -> None:
     # PyInstaller requires freeze_support() in the frozen entrypoint so
     # multiprocessing helper processes do not recurse into the CLI parser.
     multiprocessing.freeze_support()
-    from bitloops_embeddings.cli import main
+    from bitloops_local_embeddings.cli import main
 
     main()
 

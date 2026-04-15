@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from bitloops_embeddings.errors import UnsupportedModelError
-from bitloops_embeddings.registry import get_model_spec
+from bitloops_local_embeddings.errors import UnsupportedModelError
+from bitloops_local_embeddings.registry import get_model_spec
 
 
 def test_default_registry_contains_bge_m3() -> None:

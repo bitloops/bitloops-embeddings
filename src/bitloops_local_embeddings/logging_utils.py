@@ -9,11 +9,11 @@ from logging.handlers import SysLogHandler
 from pathlib import Path
 from typing import Optional
 
-from bitloops_embeddings.errors import BitloopsEmbeddingsError
+from bitloops_local_embeddings.errors import BitloopsEmbeddingsError
 
 
-LOGGER_NAME = "bitloops_embeddings"
-LOG_FORMAT = "[bitloops-embeddings] level=%(levelname)s %(message)s"
+LOGGER_NAME = "bitloops_local_embeddings"
+LOG_FORMAT = "[bitloops-local-embeddings] level=%(levelname)s %(message)s"
 
 
 def configure_logging(

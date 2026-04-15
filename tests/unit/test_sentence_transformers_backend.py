@@ -5,8 +5,8 @@ from types import ModuleType
 
 import pytest
 
-from bitloops_embeddings.errors import UnsupportedDeviceError
-from bitloops_embeddings.backend.sentence_transformers_backend import (
+from bitloops_local_embeddings.errors import UnsupportedDeviceError
+from bitloops_local_embeddings.backend.sentence_transformers_backend import (
     SentenceTransformersBackend,
     _configure_tqdm_lock_for_single_process,
     resolve_inference_device,
@@ -42,8 +42,8 @@ def test_sentence_transformers_backend_retries_transient_load_failures(
     fake_module = ModuleType("sentence_transformers")
     fake_module.SentenceTransformer = FakeSentenceTransformer
     monkeypatch.setitem(sys.modules, "sentence_transformers", fake_module)
-    monkeypatch.setattr("bitloops_embeddings.backend.sentence_transformers_backend.time.sleep", lambda _: None)
-    monkeypatch.setattr("bitloops_embeddings.backend.sentence_transformers_backend.platform.system", lambda: "Linux")
+    monkeypatch.setattr("bitloops_local_embeddings.backend.sentence_transformers_backend.time.sleep", lambda _: None)
+    monkeypatch.setattr("bitloops_local_embeddings.backend.sentence_transformers_backend.platform.system", lambda: "Linux")
     FakeSentenceTransformer.attempts = 0
     FakeSentenceTransformer.last_device = None
 
@@ -71,7 +71,7 @@ def test_configure_tqdm_lock_uses_thread_lock(monkeypatch) -> None:
     monkeypatch.setitem(sys.modules, "tqdm", fake_tqdm_package)
     monkeypatch.setitem(sys.modules, "tqdm.autonotebook", fake_tqdm_autonotebook)
     monkeypatch.setattr(
-        "bitloops_embeddings.backend.sentence_transformers_backend._TQDM_THREAD_LOCK_CONFIGURED",
+        "bitloops_local_embeddings.backend.sentence_transformers_backend._TQDM_THREAD_LOCK_CONFIGURED",
         False,
     )
 
@@ -94,8 +94,8 @@ def test_resolve_inference_device_prefers_mps_on_intel_mac_when_available(monkey
         },
     )()
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
-    monkeypatch.setattr("bitloops_embeddings.backend.sentence_transformers_backend.platform.system", lambda: "Darwin")
-    monkeypatch.setattr("bitloops_embeddings.backend.sentence_transformers_backend.platform.machine", lambda: "x86_64")
+    monkeypatch.setattr("bitloops_local_embeddings.backend.sentence_transformers_backend.platform.system", lambda: "Darwin")
+    monkeypatch.setattr("bitloops_local_embeddings.backend.sentence_transformers_backend.platform.machine", lambda: "x86_64")
 
     assert resolve_inference_device() == "mps"
 
@@ -112,8 +112,8 @@ def test_resolve_inference_device_falls_back_to_cpu_when_mps_is_unavailable(monk
         },
     )()
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
-    monkeypatch.setattr("bitloops_embeddings.backend.sentence_transformers_backend.platform.system", lambda: "Darwin")
-    monkeypatch.setattr("bitloops_embeddings.backend.sentence_transformers_backend.platform.machine", lambda: "x86_64")
+    monkeypatch.setattr("bitloops_local_embeddings.backend.sentence_transformers_backend.platform.system", lambda: "Darwin")
+    monkeypatch.setattr("bitloops_local_embeddings.backend.sentence_transformers_backend.platform.machine", lambda: "x86_64")
 
     assert resolve_inference_device() == "cpu"
 
@@ -130,7 +130,7 @@ def test_resolve_inference_device_honours_cpu_override(monkeypatch) -> None:
         },
     )()
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
-    monkeypatch.setattr("bitloops_embeddings.backend.sentence_transformers_backend.platform.system", lambda: "Darwin")
+    monkeypatch.setattr("bitloops_local_embeddings.backend.sentence_transformers_backend.platform.system", lambda: "Darwin")
 
     assert resolve_inference_device("cpu") == "cpu"
 
@@ -149,7 +149,7 @@ def test_resolve_inference_device_raises_clear_error_when_mps_is_requested_but_u
         },
     )()
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
-    monkeypatch.setattr("bitloops_embeddings.backend.sentence_transformers_backend.platform.system", lambda: "Darwin")
+    monkeypatch.setattr("bitloops_local_embeddings.backend.sentence_transformers_backend.platform.system", lambda: "Darwin")
 
     with pytest.raises(UnsupportedDeviceError, match="MPS was requested but is unavailable"):
         resolve_inference_device("mps")

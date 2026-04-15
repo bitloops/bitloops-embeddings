@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from bitloops_embeddings.registry import reset_model_registry
+from bitloops_local_embeddings.registry import reset_model_registry
 from tests.support import (
     build_inference_failure_model,
     build_load_failure_model,

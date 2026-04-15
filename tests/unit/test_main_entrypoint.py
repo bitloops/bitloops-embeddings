@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import bitloops_embeddings.__main__ as main_module
-import bitloops_embeddings.cli as cli_module
+import bitloops_local_embeddings.__main__ as main_module
+import bitloops_local_embeddings.cli as cli_module
 
 
 def test_run_calls_freeze_support_before_cli(monkeypatch) -> None:

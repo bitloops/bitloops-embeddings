@@ -9,10 +9,10 @@ def main() -> None:
     register_fake_model()
     forwarded_arguments = sys.argv[1:]
 
-    from bitloops_embeddings.cli import main as cli_main
+    from bitloops_local_embeddings.cli import main as cli_main
 
     sys.argv = [
-        "bitloops-embeddings",
+        "bitloops-local-embeddings",
         "daemon",
         "--model",
         "bge-m3",

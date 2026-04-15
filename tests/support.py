@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable, Optional
 
-from bitloops_embeddings.errors import BackendLoadError, InferenceError
-from bitloops_embeddings.registry import ModelSpec, register_model
+from bitloops_local_embeddings.errors import BackendLoadError, InferenceError
+from bitloops_local_embeddings.registry import ModelSpec, register_model
 
 
 class FakeBackend:

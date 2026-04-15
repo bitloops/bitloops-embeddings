@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import bitloops_embeddings.cli as cli_module
-from bitloops_embeddings.cli import app
+import bitloops_local_embeddings.cli as cli_module
+from bitloops_local_embeddings.cli import app
 from typer.testing import CliRunner
 
 

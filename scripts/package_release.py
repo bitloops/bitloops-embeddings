@@ -12,9 +12,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGE_NAME = "bitloops-embeddings"
-VERSION_FILE = ROOT / "src" / "bitloops_embeddings" / "version.py"
-ENTRYPOINT = ROOT / "src" / "bitloops_embeddings" / "__main__.py"
+PACKAGE_NAME = "bitloops-local-embeddings"
+VERSION_FILE = ROOT / "src" / "bitloops_local_embeddings" / "version.py"
+ENTRYPOINT = ROOT / "src" / "bitloops_local_embeddings" / "__main__.py"
 PYINSTALLER_COLLECT_SUBMODULES = [
     "sentence_transformers",
     "transformers.models",

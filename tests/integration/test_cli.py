@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from bitloops_embeddings.cli import app
-from bitloops_embeddings.version import __version__
+from bitloops_local_embeddings.cli import app
+from bitloops_local_embeddings.version import __version__
 from tests.support import FakeBackend, register_fake_model
 from typer.testing import CliRunner
 
