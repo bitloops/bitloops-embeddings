@@ -7,13 +7,16 @@ use serde_json::{Value, json};
 
 const READY_PROTOCOL_VERSION: u32 = 1;
 const CAPABILITIES: &[&str] = &["embed", "ping", "health", "shutdown"];
+const DEFAULT_PLATFORM_EMBEDDINGS_GATEWAY_URL: &str = "https://platform.bitloops.net/v1/embeddings";
+const PLATFORM_GATEWAY_URL_ENV: &str = "BITLOOPS_PLATFORM_GATEWAY_URL";
+const DEFAULT_PLATFORM_API_KEY_ENV: &str = "BITLOOPS_PLATFORM_GATEWAY_TOKEN";
 
 #[derive(Debug, Parser)]
 #[command(name = "bitloops-platform-embeddings")]
 pub struct Cli {
     #[arg(long)]
-    pub gateway_url: String,
-    #[arg(long)]
+    pub gateway_url: Option<String>,
+    #[arg(long, default_value = DEFAULT_PLATFORM_API_KEY_ENV)]
     pub api_key_env: String,
     #[command(subcommand)]
     command: Commands,
@@ -37,6 +40,7 @@ pub fn run(cli: Cli) -> Result<()> {
 
     match cli.command {
         Commands::Daemon(args) => {
+            let gateway_url = resolve_gateway_url(cli.gateway_url.as_deref())?;
             let api_key = std::env::var(&cli.api_key_env).with_context(|| {
                 format!(
                     "reading embeddings API token from environment variable `{}`",
@@ -44,7 +48,7 @@ pub fn run(cli: Cli) -> Result<()> {
                 )
             })?;
             let client = GatewayEmbeddingsClient::new()?;
-            let daemon = EmbeddingsDaemon::new(cli.gateway_url, api_key, args.model, client);
+            let daemon = EmbeddingsDaemon::new(gateway_url, api_key, args.model, client);
             daemon.run_with_stdio(std::io::stdin().lock(), std::io::stdout())
         }
     }
@@ -58,6 +62,22 @@ fn init_tracing() {
         )
         .with_target(false)
         .try_init();
+}
+
+fn resolve_gateway_url(explicit: Option<&str>) -> Result<String> {
+    if let Some(gateway_url) = explicit.map(str::trim).filter(|value| !value.is_empty()) {
+        return Ok(gateway_url.to_string());
+    }
+
+    if let Some(base_url) = std::env::var(PLATFORM_GATEWAY_URL_ENV)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+    {
+        return Ok(format!("{}/v1/embeddings", base_url.trim_end_matches('/')));
+    }
+
+    Ok(DEFAULT_PLATFORM_EMBEDDINGS_GATEWAY_URL.to_string())
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -605,5 +625,33 @@ mod tests {
             extract_embedding_vectors(&response).expect("vectors"),
             vec![vec![1.0, 2.0], vec![3.0, 4.0]]
         );
+    }
+
+    #[test]
+    fn resolve_gateway_url_prefers_explicit_flag() {
+        let url = resolve_gateway_url(Some("https://override.example/v1/embeddings"))
+            .expect("explicit gateway url");
+        assert_eq!(url, "https://override.example/v1/embeddings");
+    }
+
+    #[test]
+    fn resolve_gateway_url_derives_from_platform_gateway_env() {
+        unsafe {
+            std::env::set_var(PLATFORM_GATEWAY_URL_ENV, "https://platform.example");
+        }
+        let url = resolve_gateway_url(None).expect("gateway url from env");
+        unsafe {
+            std::env::remove_var(PLATFORM_GATEWAY_URL_ENV);
+        }
+        assert_eq!(url, "https://platform.example/v1/embeddings");
+    }
+
+    #[test]
+    fn resolve_gateway_url_defaults_to_production_gateway() {
+        unsafe {
+            std::env::remove_var(PLATFORM_GATEWAY_URL_ENV);
+        }
+        let url = resolve_gateway_url(None).expect("default gateway url");
+        assert_eq!(url, DEFAULT_PLATFORM_EMBEDDINGS_GATEWAY_URL);
     }
 }
